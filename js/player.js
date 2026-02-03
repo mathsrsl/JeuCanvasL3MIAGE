@@ -7,6 +7,8 @@ export default class Player extends ObjetGraphique {
         }
 
         super(x, y, size, size, "black", illustration);
+
+        this.speed = 5; // Vitesse de déplacement du joueur
     }
 
     draw(ctx) {
