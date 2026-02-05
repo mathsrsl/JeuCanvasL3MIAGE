@@ -1,16 +1,13 @@
 import Player from "./player.js";
 import Ennemi from "./ennemi.js";
 import { defineListeners, inputStates } from "./ecouteurs.js";
-import { circleCollide, rectsOverlap, rectsOverlapFromCenter,
-         circRectsOverlap, circRectsOverlapFromCenter } from "./collisionUtils.js";
+import { circRectsOverlapFromCenter } from "./collisionUtils.js";
 import { initStars, updateStars, drawDecoration } from "./decoration.js";
 import { loadAssets } from "./assetLoader.js";
-
 
 /* ###### Initialisation du jeu ###### */
 
 window.onload = init;
-
 
 /* ###### Variables globales ###### */
 
@@ -20,17 +17,18 @@ let etat, niveau, score, nbVies;
 
 let projectiles = [];
 
-
 var assetsToLoadURLs = {
-    spaceShip: { url: './assets/spaceShip.png' },
+    // Images
+    press_start: { url: './assets/images/press_start.jpg' },
+    vaisseau: { url: './assets/images/vaisseau.png' },
+    ennemi: { url: './assets/images/ennemi.png' },
 
-    logo1: { url: "https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/images/SkywardWithoutBalls.png" },
-
+    // Sons
     plop: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3', buffer: false, loop: false, volume: 1.0 },
     humbug: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3', buffer: true, loop: true, volume: 1.0 },
 };
-let loadedAssets;
 
+let loadedAssets;
 
 /* ###### Méthodes principales du jeu ###### */
 
@@ -48,7 +46,7 @@ async function init() {
     /* Création des objets du jeu */
 
     // création joueur
-    player = new Player(250, 450, loadedAssets.spaceShip);
+    player = new Player(250, 450, loadedAssets.vaisseau);
 
     //TODO: créer ennemis pour le niveau 1
     // (ici ou ailleurs car plusieurs niveaux ?)
@@ -116,17 +114,23 @@ function drawMenuAccueil() {
     // on sauvegarde le contexte graphique
     ctx.save();
     
-    ctx.fillStyle = "black";
-    ctx.font = "30px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("Bienvenue dans Shooter 2D vertical!", canvas.width / 2, canvas.height / 2 - 50);
-    ctx.font = "20px Arial";
-    ctx.fillText("Appuyez sur une touche pour commencer", canvas.width / 2, canvas.height / 2 + 20);
+    // On dessine l'image de fond du menu d'accueil
+    if (loadedAssets && loadedAssets.press_start) {
+        const img = loadedAssets.press_start;
 
-    ctx.drawImage(loadedAssets.logo1, canvas.width / 2 - 150, canvas.height / 2 + 50, 300, 100);
+        // On conserve le ratio de l'image et on la fait rentrer dans le canvas
+        const scale = Math.min(canvas.width / img.width/2, canvas.height / img.height/2);
+        const w = img.width * scale;
+        const h = img.height * scale;
+
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
+
+        ctx.drawImage(img, x, y, w, h);
+    }
     
     // Démarrage du jeu au premier appui sur une touche
-    window.onkeydown = (event) => {
+    window.onkeydown = () => {
         etat = "RUNNING";
         window.onkeydown = null;
     };
@@ -143,10 +147,10 @@ function drawGameOver() {
     ctx.textAlign = "center";
     ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 50);
     ctx.font = "24px Arial";
-    ctx.fillText("Appuyez sur une touche pour rejouer", canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText("Appuyez sur une touche pour quitter", canvas.width / 2, canvas.height / 2 + 50);
 
     // On écoute les touches pour redémarrer le jeu
-    window.onkeydown = (event) => {
+    window.onkeydown = () => {
         startGame();
         window.onkeydown = null; // on enlève l'écouteur pour ne pas redémarrer le jeu
     };
@@ -199,7 +203,6 @@ function drawEnemies() {
         ennemi.draw(ctx);
     });
 }
-
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
