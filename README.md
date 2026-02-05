@@ -24,7 +24,8 @@ Le joueur contrôle un vaisseau en bas de l’écran et doit détruire des ennem
 
 * Déplacement horizontal du vaisseau (gauche/droite)
 * Tir de projectiles pour éliminer les ennemis (haut ou espace)
-* Collision avec un ennemi ou ennemi atteignant le bas de l’écran : perte d’une vie
+* Collision avec un ennemi : perte d’une vie
+* Ennemi atteignant le bas de l’écran : perte de score
 * Fin de partie lorsque toutes les vies sont perdues
 
 ### Score et Hi-Scores
