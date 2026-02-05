@@ -23,4 +23,18 @@ export default class Player extends ObjetGraphique {
         ctx.fill();
         ctx.restore();
     }
+
+    updateFromInput(inputStates, canvas) {
+        const radius = this.width / 2;
+
+        // Gérer les déplacements horizontaux et empêcher de sortir du canvas
+        if (inputStates.left) {
+            this.x = Math.max(radius, this.x - this.speed);
+        }
+        if (inputStates.right) {
+            this.x = Math.min(canvas.width - radius, this.x + this.speed);
+        }
+
+        // possibilité d'ajouter vertical, boost, limites supplémentaires ici
+    }
 }

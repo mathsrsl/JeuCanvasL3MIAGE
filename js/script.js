@@ -1,10 +1,10 @@
 import Player from "./player.js";
+import Ennemi from "./ennemi.js";
 import { defineListeners, inputStates } from "./ecouteurs.js";
 import { circleCollide, rectsOverlap, rectsOverlapFromCenter,
-         circRectsOverlap, circRectsOverlapFromCenter } from "./collisionUtils.js";    
+         circRectsOverlap, circRectsOverlapFromCenter } from "./collisionUtils.js";
+import { initStars, updateStars, drawDecoration } from "./decoration.js";
 import { loadAssets } from "./assetLoader.js";
-
-import Ennemi from "./ennemi.js";
 
 
 /* ###### Initialisation du jeu ###### */
@@ -18,14 +18,6 @@ let canvas, ctx;
 let player, ennemis = [];
 let etat, niveau, score, nbVies;
 
-// Décoration étoilée
-let stars = [];
-const STAR_CONFIG = {
-    counts: { 1: 60, 2: 100, 3: 160 },
-    baseSpeeds: { 1: 0.4, 2: 1.2, 3: 2.4 },
-    trailBases: { 1: 0, 2: 6, 3: 14 }, // utilisé pour l'allongement visuel
-    playerInfluence: { 1: 0.01, 2: 0.03, 3: 0.06 } // influence sur la vitesse verticale
-};
 
 var assetsToLoadURLs = {
     spaceShip: { url: './assets/spaceShip.png' },
@@ -59,29 +51,17 @@ async function init() {
     //TODO: créer ennemis pour le niveau 1
     // (ici ou ailleurs car plusieurs niveaux ?)
 
-
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * (canvas.width - 40) + 20; // éviter les bords
+        const y = Math.random() * (canvas.height / 2) + 20;
+        const color = "red";
+        const size = 30;
+        ennemis.push(new Ennemi(x, y, color, size, niveau));
+    }
 
 
     /* Démarrage du jeu — boucle d'animation */
     startGame();
-}
-
-// Initialiser les étoiles en fonction du niveau
-function initStars() {
-    const count = STAR_CONFIG.counts[niveau] || STAR_CONFIG.counts[1];
-    stars = [];
-    for (let i = 0; i < count; i++) {
-        const baseSpeed = STAR_CONFIG.baseSpeeds[niveau] * (0.6 + Math.random() * 0.9);
-        const trailBase = STAR_CONFIG.trailBases[niveau] * (0.6 + Math.random() * 0.9);
-        stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            size: Math.random() * 1.6 + 0.6, // largeur visuelle
-            baseSpeed,                        // vitesse verticale de base
-            trailBase,                        // paramètre d'allongement
-            vy: baseSpeed                     // vitesse effective
-        });
-    }
 }
 
 function startGame() {
@@ -95,7 +75,7 @@ function startGame() {
     nbVies = 3;
 
     // initialiser les étoiles pour le niveau courant
-    initStars();
+    initStars(niveau, canvas);
 
     loadedAssets.humbug.play();
     defineListeners();
@@ -173,9 +153,17 @@ function drawGameOver() {
 }
 
 function drawJeu() {
-    drawDecoration();
+    // dessiner décor (étoiles etc.)
+    drawDecoration(ctx, player, niveau, canvas);
+
+    // dessiner infos (score, vies, niveau, temps)
+    // après pour mettre au-dessus du décor
     drawInfo();
-    drawPlayer();
+
+    // draw player
+    player.draw(ctx);
+
+    // draw ennemis
     drawEnemies();
 }
 
@@ -201,53 +189,6 @@ function drawInfo() {
     ctx.restore();
 }
 
-function drawDecoration() {
-    /* fond noir */
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    /* étoiles avec traînées */
-
-    ctx.save();
-
-    stars.forEach(star => {
-        // normaliser la contribution de la vitesse pour calculer l'allongement
-        const speedFactor = Math.min(2.5, star.vy / 0.6);
-        // longueur verticale de l'étoile (au moins minElong pour éviter le carré)
-        const minElong = 3; // allongement minimal en px (niveau 1 aura au moins ceci)
-        const length = Math.max(
-            minElong,
-            star.trailBase * (0.8 + 0.6 * speedFactor) + star.vy * 0.6
-        );
-
-        // largeur du rectangle (petite, proportionnelle à star.size)
-        const width = Math.max(1, star.size);
-
-        // dessin avec dégradé vertical : tête opaque -> queue transparente
-        const topY = star.y - length;
-        const grad = ctx.createLinearGradient(star.x, star.y, star.x, topY);
-        grad.addColorStop(0, "rgba(255,255,255,1)");   // tête
-        grad.addColorStop(1, "rgba(255,255,255,0)");   // queue
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.fillRect(star.x - width / 2, topY, width, length);
-
-        // Optionnel : accentuer la tête avec un petit rond plus lumineux
-        ctx.fillStyle = "rgba(255,255,255,1)";
-        ctx.beginPath();
-        ctx.arc(star.x, star.y - Math.max(0, Math.min(1.2, width / 2)), Math.max(0.6, width / 1.5), 0, Math.PI * 2);
-        ctx.fill();
-    });
-
-    ctx.restore();
-}
-
-
-function drawPlayer() {
-    player.draw(ctx);
-}
-
 function drawEnemies() {
     ennemis.forEach(ennemi => {
         ennemi.draw(ctx);
@@ -260,11 +201,13 @@ function drawEnemies() {
 function updateGameState() {
     if (etat === "RUNNING") {
         // mettre à jour les étoiles
-        updateStars();
+        updateStars(player, niveau, canvas);
 
         // déplacer joueur et ennemis
-        deplacerJoueur();
-        deplacerEnnemis();
+        player.updateFromInput(inputStates, canvas);
+        for (let ennemi of ennemis) {
+            ennemi.move(canvas.width, canvas.height);
+        }
 
         // detecter collisions joueur-ennemis
         ennemis.forEach(ennemi => {
@@ -304,51 +247,6 @@ function updateGameState() {
             }
         });
     }
-}
-
-// Mettre à jour les étoiles (appelé chaque frame quand RUNNING)
-function updateStars() {
-    const maxY = canvas.height;
-    const pInfluence = STAR_CONFIG.playerInfluence[niveau] || STAR_CONFIG.playerInfluence[1];
-
-    stars.forEach(star => {
-        // vitesse verticale = base + influence de la vitesse du joueur
-        const extraFromPlayer = (player && player.speed) ? player.speed * pInfluence : 0;
-        star.vy = star.baseSpeed + extraFromPlayer;
-
-        // mouvement vertical uniquement (ne pas modifier star.x)
-        star.y += star.vy;
-
-        // réapparition en haut quand dépasse le bas (recréer caractéristiques)
-        if (star.y > maxY + 10) {
-            star.y = -10 - Math.random() * 20;
-            star.x = Math.random() * canvas.width;
-            star.size = Math.random() * 1.6 + 0.6;
-            star.baseSpeed = STAR_CONFIG.baseSpeeds[niveau] * (0.6 + Math.random() * 0.9);
-            star.trailBase = STAR_CONFIG.trailBases[niveau] * (0.6 + Math.random() * 0.9);
-            star.vy = star.baseSpeed;
-            star.drift = (Math.random() - 0.5) * 0.6;
-            star.spagFactor = 0.6 + Math.random() * 0.8;
-        }
-    });
-}
-
-function deplacerJoueur() {
-    const radius = player.width / 2;
-
-    // Gérer les déplacements horizontaux et empêcher de sortir du canvas
-    if (inputStates.left) {
-        player.x = Math.max(radius, player.x - player.speed);
-    }
-    if (inputStates.right) {
-        player.x = Math.min(canvas.width - radius, player.x + player.speed);
-    }
-}
-
-function deplacerEnnemis() {
-    ennemis.forEach(ennemi => {
-        ennemi.move(canvas.width, canvas.height);
-    });
 }
 
 // TODO: Gestion des tirs du joueur (touche espace ou up arrow)
