@@ -272,6 +272,11 @@ function updateGameState() {
                 // Décrémenter le nombre de vies
                 nbVies -= 1;
 
+                // si plus de vies, GAMEOVER
+                if (nbVies <= 0) {
+                    etat = "GAMEOVER";
+                    console.log("Game Over !");
+                }
 
                 // si plus d'ennemis, on passe au niveau suivant
                 if(ennemis.length === 0) {
