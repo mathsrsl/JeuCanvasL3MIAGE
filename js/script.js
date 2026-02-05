@@ -18,6 +18,8 @@ let canvas, ctx;
 let player, ennemis = [];
 let etat, niveau, score, nbVies;
 
+let projectiles = [];
+
 
 var assetsToLoadURLs = {
     spaceShip: { url: './assets/spaceShip.png' },
@@ -163,6 +165,9 @@ function drawJeu() {
     // draw player
     player.draw(ctx);
 
+    // draw projectiles
+    projectiles.forEach(p => p.draw(ctx));
+
     // draw ennemis
     drawEnemies();
 }
@@ -198,23 +203,63 @@ function drawEnemies() {
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
+// javascript
 function updateGameState() {
     if (etat === "RUNNING") {
         // mettre à jour les étoiles
         updateStars(player, niveau, canvas);
 
-        // déplacer joueur et ennemis
-        player.updateFromInput(inputStates, canvas);
-        for (let ennemi of ennemis) {
-            ennemi.move(canvas.width, canvas.height);
+        // mettre à jour état du joueur et ennemis (position, tirs, etc.)
+        const newProj = player.updateFromInput(inputStates, canvas);
+        if (newProj) {
+            projectiles.push(newProj);
         }
 
-        // detecter collisions joueur-ennemis
-        ennemis.forEach(ennemi => {
+        // mettre à jour les projectiles
+        // on met à jour et on purge en une passe (itération arrière pour pouvoir splice)
+        for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+            const p = projectiles[pi];
+            p.update(canvas);
+            if (!p.active) {
+                projectiles.splice(pi, 1);
+            }
+        }
+
+        // collision projectile-ennemi
+        // itération arrière sur ennemis pour pouvoir supprimer sans problème d'index
+        for (let ei = ennemis.length - 1; ei >= 0; ei--) {
+            const ennemi = ennemis[ei];
+
+            // déplacer l'ennemi (conserve le comportement existant)
+            ennemi.move(canvas.width, canvas.height);
+
+            // vérifier collision avec projectiles (itération arrière sur projectiles pour splice sûr)
+            let touched = false;
+            for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+                const p = projectiles[pi];
+                if (!p.active) continue;
+                if (circRectsOverlapFromCenter(
+                    p.x, p.y, p.width / 2, p.height / 2,
+                    ennemi.x, ennemi.y, ennemi.width, ennemi.height
+                )) {
+                    // désactiver projectile et supprimer ennemi
+                    p.active = false;
+                    projectiles.splice(pi, 1);
+                    ennemis.splice(ei, 1);
+                    touched = true;
+                    // jouer son, ajouter score
+                    if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+                    score += 10;
+                    break;
+                }
+            }
+            if (touched) continue; // ennemi déjà retiré, passer au suivant
+
+            // detecter collisions joueur-ennemis
             // pour le joueur on a un cercle, pour l'ennemi un rectangle
             // la largeur du joueur = deux fois le rayon, on passe donc la moitié de la largeur
             // comme rayon.
-            if(circRectsOverlapFromCenter(player.x, player.y, player.width/2, player.height/2,
+            if (circRectsOverlapFromCenter(player.x, player.y, player.width/2, player.height/2,
                 ennemi.x, ennemi.y, ennemi.width, ennemi.height)) {
                 console.log("Collision joueur-ennemi détectée !");
 
@@ -222,7 +267,7 @@ function updateGameState() {
                 loadedAssets.plop.play();
 
                 // Tuer l'ennemi (retirer de la liste)
-                ennemis.splice(ennemis.indexOf(ennemi), 1);
+                ennemis.splice(ei, 1);
 
                 // Décrémenter le nombre de vies
                 nbVies -= 1;
@@ -245,7 +290,7 @@ function updateGameState() {
                     }
                 }
             }
-        });
+        }
     }
 }
 

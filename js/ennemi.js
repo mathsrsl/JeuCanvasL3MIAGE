@@ -7,8 +7,10 @@ export default class Ennemi extends ObjetGraphique {
         // définir une vitesse en fonction du niveau
         const speedMagnitude = 1 + niveau * 0.5;
         const angle = Math.random() * 2 * Math.PI;
-        this.speedY = speedMagnitude * Math.cos(angle);
 
+        // vitesse random en fonction du niveau
+        // direction de bas en haut forcée
+        this.speedY = Math.abs(speedMagnitude * Math.sin(angle)) + 0.5;
     }
 
     draw(ctx) {
@@ -34,7 +36,6 @@ export default class Ennemi extends ObjetGraphique {
     move(largeurCanvas, hauteurCanvas) {
 
         // Déplacement de haut en bas
-
         this.y += this.speedY;
 
         // si l'ennemi est sorti par le bas, le remettre en haut à une position x aléatoire
