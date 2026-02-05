@@ -1,34 +1,46 @@
-let inputStates = {};
+export const inputStates = {
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    space: false
+};
 
-function defineListeners() {
+// flag pour éviter les appuis accidentels (ex: qd game over)
+let listenersAttached = false;
+
+export function defineListeners() {
+    if (listenersAttached) return;
+    listenersAttached = true;
+
 
     /* Ecouteurs pour le clavier */
 
     // keydown
-    document.onkeydown = (event) => {
-        if (event.key === "ArrowLeft") {
-            inputStates.left = true;
-        } else if (event.key === "ArrowRight") {
-            inputStates.right = true;
-        } else if (event.key === "ArrowUp") {
-            inputStates.up = true;
-        } else if (event.key === " ") {
-            inputStates.space = true;
+    window.addEventListener('keydown', (e) => {
+        switch (e.code) {
+            case 'ArrowLeft': case 'KeyA': inputStates.left = true; break;
+            case 'ArrowRight': case 'KeyD': inputStates.right = true; break;
+            case 'ArrowUp': case 'KeyW': inputStates.up = true; break;
+            case 'ArrowDown': case 'KeyS': inputStates.down = true; break;
+            case 'Space': inputStates.space = true; break;
         }
-    };
+    });
 
     // keyup
-    document.onkeyup = (event) => {
-        if (event.key === "ArrowLeft") {
-            inputStates.left = false;
-        } else if (event.key === "ArrowRight") {
-            inputStates.right = false;
-        } else if (event.key === "ArrowUp") {
-            inputStates.up = false;
-        } else if (event.key === " ") {
-            inputStates.space = false;
+    window.addEventListener('keyup', (e) => {
+        switch (e.code) {
+            case 'ArrowLeft': case 'KeyA': inputStates.left = false; break;
+            case 'ArrowRight': case 'KeyD': inputStates.right = false; break;
+            case 'ArrowUp': case 'KeyW': inputStates.up = false; break;
+            case 'ArrowDown': case 'KeyS': inputStates.down = false; break;
+            case 'Space': inputStates.space = false; break;
         }
-    };
+    });
 }
 
-export { defineListeners, inputStates };
+export function clearInput() {
+    for (const k in inputStates) {
+        if (Object.prototype.hasOwnProperty.call(inputStates, k)) inputStates[k] = false;
+    }
+}

@@ -34,16 +34,9 @@ export default class Ennemi extends ObjetGraphique {
     }
 
     move(largeurCanvas, hauteurCanvas) {
-
         // Déplacement de haut en bas
         this.y += this.speedY;
-
-        // si l'ennemi est sorti par le bas, le remettre en haut à une position x aléatoire
-        if(this.y - this.height/2 > hauteurCanvas) {
-            this.y = -this.height/2;
-            this.x = Math.random() * (largeurCanvas - this.height) + this.height/2;
-        }
     }
 
-    // TODO : Gérer tirs ennemis et +
+    // TODO : Gérer tirs ennemis et + (pas niveau 1)
 }

@@ -1,8 +1,7 @@
 import Player from "./player.js";
 import Ennemi from "./ennemi.js";
-import { defineListeners, inputStates } from "./ecouteurs.js";
-import { circleCollide, rectsOverlap, rectsOverlapFromCenter,
-         circRectsOverlap, circRectsOverlapFromCenter } from "./collisionUtils.js";
+import { defineListeners, inputStates, clearInput } from "./ecouteurs.js";
+import { circRectsOverlapFromCenter } from "./collisionUtils.js";
 import { initStars, updateStars, drawDecoration } from "./decoration.js";
 import { loadAssets } from "./assetLoader.js";
 
@@ -15,21 +14,40 @@ window.onload = init;
 /* ###### Variables globales ###### */
 
 let canvas, ctx;
+
 let player, ennemis = [];
+
 let etat, niveau, score, nbVies;
+const GAMEOVER_COOLDOWN_MS = 600; // durée du cooldown en ms
+let gameOverCooldownUntil = 0;
 
 let projectiles = [];
 
+const assetsToLoadURLs = {
+    spaceShip: {url: './assets/spaceShip.png'},
 
-var assetsToLoadURLs = {
-    spaceShip: { url: './assets/spaceShip.png' },
+    logo1: {url: "https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/images/SkywardWithoutBalls.png"},
 
-    logo1: { url: "https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/images/SkywardWithoutBalls.png" },
-
-    plop: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3', buffer: false, loop: false, volume: 1.0 },
-    humbug: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3', buffer: true, loop: true, volume: 1.0 },
+    plop: {
+        url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3',
+        buffer: false,
+        loop: false,
+        volume: 1.0
+    },
+    humbug: {
+        url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3',
+        buffer: true,
+        loop: true,
+        volume: 1.0,
+        isPlaying: undefined
+    },
 };
 let loadedAssets;
+
+/* Flags pour gestion propre des touches / boucle */
+let awaitingKeyRelease = false;
+let gameOverKeyListenerAttached = false;
+let loopStarted = false;
 
 
 /* ###### Méthodes principales du jeu ###### */
@@ -50,40 +68,62 @@ async function init() {
     // création joueur
     player = new Player(250, 450, loadedAssets.spaceShip);
 
-    //TODO: créer ennemis pour le niveau 1
-    // (ici ou ailleurs car plusieurs niveaux ?)
-
-    for (let i = 0; i < 5; i++) {
-        const x = Math.random() * (canvas.width - 40) + 20; // éviter les bords
-        const y = Math.random() * (canvas.height / 2) + 20;
-        const color = "red";
-        const size = 30;
-        ennemis.push(new Ennemi(x, y, color, size, niveau));
-    }
-
+    // définir listeners de gameplay (idempotent)
+    defineListeners();
 
     /* Démarrage du jeu — boucle d'animation */
     startGame();
 }
 
-function startGame() {
-    console.log("Démarrage du jeu");
 
-    etat = "HOME";
+function startGame(goToHome = true) {
+    console.log("Démarrage du jeu");
 
     // initialisation des variables du jeu
     niveau = 1;
     score = 0;
     nbVies = 3;
 
+    // reset en cas de game over ou redémarrage
+    ennemis = [];
+    projectiles = [];
+
+    // reset input tenu (important si touche était maintenue)
+    clearInput();
+
+    // reset état du joueur
+    if (player) {
+        player.x = 250;
+        player.y = 450;
+        if (typeof player.lastShotAt !== "undefined") player.lastShotAt = 0;
+    }
+
+    // TODO : A bougé pour gestion en fonction du niveau ?
+    // (Re)créer les ennemis pour le niveau 1
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * (canvas.width - 40) + 20;
+        const y = Math.random() * (canvas.height / 2) + 20;
+        const color = "red";
+        const size = 30;
+        ennemis.push(new Ennemi(x, y, color, size, niveau));
+    }
+
     // initialiser les étoiles pour le niveau courant
     initStars(niveau, canvas);
 
-    loadedAssets.humbug.play();
-    defineListeners();
+    // musique de fond si pas déjà lancée
+    if (loadedAssets && loadedAssets.humbug && !loadedAssets.humbug.isPlaying) {
+        loadedAssets.humbug.play();
+        loadedAssets.humbug.isPlaying = true;
+    }
+
+    etat = goToHome ? "HOME" : "RUNNING";
 
     // Lance la boucle d'animation
-    requestAnimationFrame(gameLoop);
+    if (!loopStarted) {
+        loopStarted = true;
+        requestAnimationFrame(gameLoop);
+    }
 }
 
 function gameLoop() {
@@ -124,12 +164,15 @@ function drawMenuAccueil() {
     ctx.fillText("Appuyez sur une touche pour commencer", canvas.width / 2, canvas.height / 2 + 20);
 
     ctx.drawImage(loadedAssets.logo1, canvas.width / 2 - 150, canvas.height / 2 + 50, 300, 100);
-    
-    // Démarrage du jeu au premier appui sur une touche
-    window.onkeydown = (event) => {
+
+    // démarrage au premier appui (listener retiré ensuite)
+    const onHomeKey = () => {
+        // vider les entrées au cas où
+        clearInput();
         etat = "RUNNING";
-        window.onkeydown = null;
+        window.removeEventListener('keydown', onHomeKey);
     };
+    window.addEventListener('keydown', onHomeKey, { once: true });
 
     // restaure le contexte graphique -> revient à l'état avant le ctx.save()
     ctx.restore();
@@ -145,11 +188,12 @@ function drawGameOver() {
     ctx.font = "24px Arial";
     ctx.fillText("Appuyez sur une touche pour rejouer", canvas.width / 2, canvas.height / 2 + 20);
 
-    // On écoute les touches pour redémarrer le jeu
-    window.onkeydown = (event) => {
-        startGame();
-        window.onkeydown = null; // on enlève l'écouteur pour ne pas redémarrer le jeu
-    };
+    // Attacher le mécanisme keyup -> keydown une seule fois
+    if (!gameOverKeyListenerAttached) {
+        awaitingKeyRelease = true;
+        window.addEventListener('keyup', onGameOverKeyUp, { once: true });
+        gameOverKeyListenerAttached = true;
+    }
 
     ctx.restore();
 }
@@ -203,7 +247,7 @@ function drawEnemies() {
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
-// javascript
+//TODO: méthode à optimisé/découper
 function updateGameState() {
     if (etat === "RUNNING") {
         // mettre à jour les étoiles
@@ -225,6 +269,11 @@ function updateGameState() {
             }
         }
 
+        // définir points selon le niveau
+        const hitPoints = (niveau === 1) ? 10 : (niveau === 2) ? 15 : 20;
+        const missPenalty = (niveau === 1) ? 5 : (niveau === 2) ? 7 : 10;
+
+
         // collision projectile-ennemi
         // itération arrière sur ennemis pour pouvoir supprimer sans problème d'index
         for (let ei = ennemis.length - 1; ei >= 0; ei--) {
@@ -232,6 +281,35 @@ function updateGameState() {
 
             // déplacer l'ennemi (conserve le comportement existant)
             ennemi.move(canvas.width, canvas.height);
+
+            // si l'ennemi atteint le bas de l'écran -> pénalité et suppression
+            if (ennemi.y - ennemi.height / 2 > canvas.height) {
+                console.log("Ennemi a atteint le bas de l'écran !");
+
+                // retirer l'ennemi et appliquer pénalité selon le niveau
+                ennemis.splice(ei, 1);
+                score -= missPenalty;
+                if (score < 0) score = 0;
+
+                // si plus d'ennemis, on passe au niveau suivant
+                if (ennemis.length === 0) {
+                    if (niveau === 1) {
+                        niveau += 1;
+
+                        console.log("Niveau suivant : " + niveau);
+
+                        //TODO: Créer de nouveaux ennemis pour le niveau 2
+                        // (peut etre à déporter autre part dans le code ?)
+
+                    } else {
+                        //TODO: gérer écran de victoire d'un niveau donné
+                        startGameOverSequence();
+                        console.log("Vous avez gagné !");
+                    }
+                }
+
+                continue; // ennemi traité, passer au suivant
+            }
 
             // vérifier collision avec projectiles (itération arrière sur projectiles pour splice sûr)
             let touched = false;
@@ -247,9 +325,11 @@ function updateGameState() {
                     projectiles.splice(pi, 1);
                     ennemis.splice(ei, 1);
                     touched = true;
+
                     // jouer son, ajouter score
                     if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
-                    score += 10;
+                    score += hitPoints;
+
                     break;
                 }
             }
@@ -274,7 +354,7 @@ function updateGameState() {
 
                 // si plus de vies, GAMEOVER
                 if (nbVies <= 0) {
-                    etat = "GAMEOVER";
+                    startGameOverSequence();
                     console.log("Game Over !");
                 }
 
@@ -290,7 +370,7 @@ function updateGameState() {
 
                     } else {
                         //TODO: gérer écran de victoire d'un niveau donné
-                        etat = "GAMEOVER";
+                        startGameOverSequence();
                         console.log("Vous avez gagné !");
                     }
                 }
@@ -299,6 +379,38 @@ function updateGameState() {
     }
 }
 
-// TODO: Gestion des tirs du joueur (touche espace ou up arrow)
+function startGameOverSequence() {
+    if (gameOverKeyListenerAttached) return; // déjà en attente
+    // poser l'état et préparer le cooldown
+    etat = "GAMEOVER";
+    gameOverCooldownUntil = performance.now() + GAMEOVER_COOLDOWN_MS;
+    awaitingKeyRelease = true;
+    gameOverKeyListenerAttached = true;
 
-// TODO: A déplacer dans Player.js ??
+    // vider les entrées immédiatement pour éviter rebonds
+    clearInput();
+
+    // demander d'abord un keyup (libération de la touche déjà maintenue)
+    window.addEventListener('keyup', onGameOverKeyUp, { once: true });
+}
+
+function onGameOverKeyUp() {
+    // libération détectée : maintenant on écoute keydown mais on ignore tant que cooldown non écoulé
+    awaitingKeyRelease = false;
+    window.removeEventListener('keyup', onGameOverKeyUp);
+    // on attache sans { once: true } pour pouvoir filtrer les keydown prématurés
+    window.addEventListener('keydown', onGameOverKeyDown);
+}
+
+function onGameOverKeyDown() {
+    // si cooldown toujours actif, on ignore l'appui
+    if (performance.now() < gameOverCooldownUntil) {
+        return;
+    }
+
+    // keydown valide : cleanup et redémarrage
+    window.removeEventListener('keydown', onGameOverKeyDown);
+    gameOverKeyListenerAttached = false;
+    clearInput();
+    startGame(false);
+}
