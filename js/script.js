@@ -4,6 +4,7 @@ import { defineListeners, inputStates, clearInput } from "./ecouteurs.js";
 import { circRectsOverlapFromCenter } from "./collisionUtils.js";
 import { initStars, updateStars, drawDecoration } from "./decoration.js";
 import { loadAssets } from "./assetLoader.js";
+import { getLevelConfig, getMaxLevel } from "./levelConfig.js";
 
 
 /* ###### Initialisation du jeu ###### */
@@ -22,6 +23,11 @@ const GAMEOVER_COOLDOWN_MS = 600; // durée du cooldown en ms
 let gameOverCooldownUntil = 0;
 
 let projectiles = [];
+let levelConfig = null;
+const spawnState = {
+    spawned: 0,
+    nextSpawnAt: 0
+};
 
 const assetsToLoadURLs = {
     spaceShip: {url: './assets/spaceShip.png'},
@@ -80,7 +86,6 @@ function startGame(goToHome = true) {
     console.log("Démarrage du jeu");
 
     // initialisation des variables du jeu
-    niveau = 1;
     score = 0;
     nbVies = 3;
 
@@ -98,18 +103,8 @@ function startGame(goToHome = true) {
         if (typeof player.lastShotAt !== "undefined") player.lastShotAt = 0;
     }
 
-    // TODO : A bougé pour gestion en fonction du niveau ?
-    // (Re)créer les ennemis pour le niveau 1
-    for (let i = 0; i < 5; i++) {
-        const x = Math.random() * (canvas.width - 40) + 20;
-        const y = Math.random() * (canvas.height / 2) + 20;
-        const color = "red";
-        const size = 30;
-        ennemis.push(new Ennemi(x, y, color, size, niveau));
-    }
-
-    // initialiser les étoiles pour le niveau courant
-    initStars(niveau, canvas);
+    // initialiser le niveau et sa configuration
+    initLevel(1);
 
     // musique de fond si pas déjà lancée
     if (loadedAssets && loadedAssets.humbug && !loadedAssets.humbug.isPlaying) {
@@ -244,6 +239,131 @@ function drawEnemies() {
     });
 }
 
+function initLevel(level) {
+    niveau = level;
+    levelConfig = getLevelConfig(level);
+    ennemis = [];
+    spawnState.spawned = 0;
+    spawnState.nextSpawnAt = performance.now() + (levelConfig.spawn.initialDelayMs ?? 0);
+    initStars(niveau, canvas);
+}
+
+function randBetween(min, max) {
+    return min + Math.random() * (max - min);
+}
+
+function randChoice(list) {
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+function scheduleNextSpawn() {
+    const [minInterval, maxInterval] = levelConfig.spawn.intervalMs;
+    spawnState.nextSpawnAt = performance.now() + randBetween(minInterval, maxInterval);
+}
+
+function getSpawnPosition(edge, size) {
+    const margin = size / 2;
+    if (edge === "top") {
+        return { x: randBetween(margin, canvas.width - margin), y: -margin };
+    }
+    if (edge === "bottom") {
+        return { x: randBetween(margin, canvas.width - margin), y: canvas.height + margin };
+    }
+    if (edge === "left") {
+        return { x: -margin, y: randBetween(margin, canvas.height - margin) };
+    }
+    if (edge === "right") {
+        return { x: canvas.width + margin, y: randBetween(margin, canvas.height - margin) };
+    }
+    return { x: randBetween(margin, canvas.width - margin), y: -margin };
+}
+
+function spawnEnemyFromConfig(config) {
+    const edge = randChoice(config.spawn.edges);
+    const size = config.enemy.size;
+    const { x, y } = getSpawnPosition(edge, size);
+
+    const speed = randBetween(config.spawn.speed[0], config.spawn.speed[1]);
+    const driftX = config.spawn.driftX ?? [0, 0];
+    const driftY = config.spawn.driftY ?? [0, 0];
+
+    let vx = 0;
+    let vy = 0;
+    if (edge === "top") {
+        vx = randBetween(driftX[0], driftX[1]);
+        vy = speed;
+    } else if (edge === "bottom") {
+        vx = randBetween(driftX[0], driftX[1]);
+        vy = -speed;
+    } else if (edge === "left") {
+        vx = speed;
+        vy = randBetween(driftY[0], driftY[1]);
+    } else if (edge === "right") {
+        vx = -speed;
+        vy = randBetween(driftY[0], driftY[1]);
+    }
+
+    const options = {
+        ...config.enemy,
+        vx,
+        vy
+    };
+    ennemis.push(new Ennemi(x, y, options));
+}
+
+function updateSpawning() {
+    if (!levelConfig) return;
+    const totalToSpawn = levelConfig.spawn.totalToSpawn ?? Infinity;
+    if (spawnState.spawned >= totalToSpawn) return;
+    if (ennemis.length >= levelConfig.spawn.maxAlive) return;
+
+    const now = performance.now();
+    if (now >= spawnState.nextSpawnAt) {
+        spawnEnemyFromConfig(levelConfig);
+        spawnState.spawned += 1;
+        scheduleNextSpawn();
+    }
+}
+
+function isEnemyOffscreen(ennemi) {
+    const margin = Math.max(ennemi.width, ennemi.height);
+    return (
+        ennemi.x < -margin ||
+        ennemi.x > canvas.width + margin ||
+        ennemi.y < -margin ||
+        ennemi.y > canvas.height + margin
+    );
+}
+
+function isEnemyEscaped(ennemi, escapeSides) {
+    if (!escapeSides || escapeSides.length === 0) return false;
+    const margin = Math.max(ennemi.width, ennemi.height);
+    const escaped = {
+        left: ennemi.x + margin < 0,
+        right: ennemi.x - margin > canvas.width,
+        top: ennemi.y + margin < 0,
+        bottom: ennemi.y - margin > canvas.height
+    };
+    return escapeSides.some(side => escaped[side]);
+}
+
+function handleLevelProgress() {
+    if (etat !== "RUNNING") return;
+    if (!levelConfig) return;
+    const totalToSpawn = levelConfig.spawn.totalToSpawn ?? Infinity;
+    if (spawnState.spawned < totalToSpawn) return;
+    if (ennemis.length > 0) return;
+
+    const maxLevel = getMaxLevel();
+    if (niveau < maxLevel) {
+        console.log("Niveau suivant : " + (niveau + 1));
+        initLevel(niveau + 1);
+    } else {
+        startGameOverSequence();
+        console.log("Vous avez gagné !");
+    }
+}
+
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
@@ -269,9 +389,12 @@ function updateGameState() {
             }
         }
 
+        // générer des ennemis de manière continue selon le niveau
+        updateSpawning();
+
         // définir points selon le niveau
-        const hitPoints = (niveau === 1) ? 10 : (niveau === 2) ? 15 : 20;
-        const missPenalty = (niveau === 1) ? 5 : (niveau === 2) ? 7 : 10;
+        const hitPoints = levelConfig?.scoring?.hitPoints ?? 10;
+        const missPenalty = levelConfig?.scoring?.missPenalty ?? 5;
 
 
         // collision projectile-ennemi
@@ -280,33 +403,18 @@ function updateGameState() {
             const ennemi = ennemis[ei];
 
             // déplacer l'ennemi (conserve le comportement existant)
-            ennemi.move(canvas.width, canvas.height);
+            ennemi.move();
 
-            // si l'ennemi atteint le bas de l'écran -> pénalité et suppression
-            if (ennemi.y - ennemi.height / 2 > canvas.height) {
-                console.log("Ennemi a atteint le bas de l'écran !");
+            // si l'ennemi sort de l'écran -> pénalité éventuelle et suppression
+            if (isEnemyOffscreen(ennemi)) {
+                console.log("Ennemi sorti de l'écran !");
 
                 // retirer l'ennemi et appliquer pénalité selon le niveau
-                ennemis.splice(ei, 1);
-                score -= missPenalty;
-                if (score < 0) score = 0;
-
-                // si plus d'ennemis, on passe au niveau suivant
-                if (ennemis.length === 0) {
-                    if (niveau === 1) {
-                        niveau += 1;
-
-                        console.log("Niveau suivant : " + niveau);
-
-                        //TODO: Créer de nouveaux ennemis pour le niveau 2
-                        // (peut etre à déporter autre part dans le code ?)
-
-                    } else {
-                        //TODO: gérer écran de victoire d'un niveau donné
-                        startGameOverSequence();
-                        console.log("Vous avez gagné !");
-                    }
+                if (isEnemyEscaped(ennemi, levelConfig?.escapeSides)) {
+                    score -= missPenalty;
+                    if (score < 0) score = 0;
                 }
+                ennemis.splice(ei, 1);
 
                 continue; // ennemi traité, passer au suivant
             }
@@ -357,25 +465,11 @@ function updateGameState() {
                     startGameOverSequence();
                     console.log("Game Over !");
                 }
-
-                // si plus d'ennemis, on passe au niveau suivant
-                if(ennemis.length === 0) {
-                    if(niveau === 1) {
-                        niveau += 1;
-
-                        console.log("Niveau suivant : " + niveau);
-
-                        //TODO: Créer de nouveaux ennemis pour le niveau 2
-                        // (peut etre à déporter autre part dans le code ?)
-
-                    } else {
-                        //TODO: gérer écran de victoire d'un niveau donné
-                        startGameOverSequence();
-                        console.log("Vous avez gagné !");
-                    }
-                }
             }
         }
+
+        // vérifier si le niveau est terminé
+        handleLevelProgress();
     }
 }
 
