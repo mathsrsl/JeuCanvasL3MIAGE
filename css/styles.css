@@ -12,6 +12,15 @@ body {
 
 h1 {
     text-align: center;
+    font-size: 3rem;
+}
+
+.contenu-infos-jeu {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 500px;
+    font-size: 1.5rem;
 }
 
 #monCanvas {

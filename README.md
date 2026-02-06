@@ -3,6 +3,7 @@
 ## L3 MIAGE 2026
 
 - Mathieu ROSSEL TD1 TP1
+- Maxime JOURDANNEY TD1 TP2
 
 ---
 
@@ -11,7 +12,6 @@
 > Documenter jeu
 > Présenter/documenter ressources externes utilisées
 > Indiquer outils IA utilisés
-
 
 ---
 

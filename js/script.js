@@ -18,7 +18,7 @@ let canvas, ctx;
 
 let player, ennemis = [];
 
-let etat, niveau, score, nbVies;
+let etat, score, niveau, nbVies, temps;
 const GAMEOVER_COOLDOWN_MS = 600; // durée du cooldown en ms
 let gameOverCooldownUntil = 0;
 
@@ -39,7 +39,7 @@ var assetsToLoadURLs = {
     plop: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3', buffer: false, loop: false, volume: 1.0 },
     humbug: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3', buffer: true, loop: true, volume: 1.0, isPlaying: undefined },
 };
-let loadedAssets;
+export let loadedAssets;
 
 /* Flags pour gestion propre des touches / boucle */
 let awaitingKeyRelease = false;
@@ -214,18 +214,18 @@ function drawJeu() {
 function drawInfo() {
     ctx.save();
 
-    // TODO : utiliser plutot avec le CSS pour une meilleure interface (z-index etc.)
+    // Affichages des infos du jeu : score, vies, niveau, temps
+    const tabP = document.getElementsByClassName("infos-jeu");
 
-    ctx.fillStyle = "white";
-    ctx.font = "24px Arial";
-    ctx.textAlign = "left";
+    const scoreP = tabP[0];
+    const viesP = tabP[1];
+    const niveauP = tabP[2];
+    const tempsP = tabP[3];
 
-    ctx.fillText("Niveau : " + niveau, 10, 60);
-    ctx.fillText("Score : " + score, 10, 30);
-    ctx.fillText("Vies : " + nbVies, 10, 90);
-
-    ctx.textAlign = "right";
-    ctx.fillText("Temps : " + Math.floor(performance.now() / 1000) + " s", canvas.width - 10, 30);
+    scoreP.textContent = "Score : " + score;
+    viesP.textContent = "Vies : " + nbVies;
+    niveauP.textContent = "Niveau : " + niveau;
+    tempsP.textContent = "Temps : " + Math.floor(performance.now() / 1000) + " s";
 
     ctx.restore();
 }

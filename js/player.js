@@ -1,5 +1,6 @@
 import ObjetGraphique from "./objetGraphique.js";
 import Projectile from "./projectile.js";
+import {loadedAssets} from "./script.js";
 
 export default class Player extends ObjetGraphique {
     constructor(x, y, illustration, size = 32) {
@@ -34,19 +35,20 @@ export default class Player extends ObjetGraphique {
         const radius = this.width / 2;
 
         // Gérer les déplacements horizontaux et empêcher de sortir du canvas
-        if (inputStates.left) {
-            this.x = Math.max(radius, this.x - this.speed);
-        }
-        if (inputStates.right) {
-            this.x = Math.min(canvas.width - radius, this.x + this.speed);
-        }
+        if (inputStates.left) this.x = Math.max(radius, this.x - this.speed);
+        if (inputStates.right) this.x = Math.min(canvas.width - radius, this.x + this.speed);
+        if (inputStates.up) this.y = Math.max(radius, this.y - this.speed);
+        if (inputStates.down) this.y = Math.min(canvas.height - radius, this.y + this.speed);
+
 
         // Gérer les tirs
         const now = performance.now();
 
-        const wantsToShoot = inputStates.space || inputStates.up;
-        if (wantsToShoot && now - this.lastShotAt >= this.shotCooldown) {
+        if (inputStates.space && now - this.lastShotAt >= this.shotCooldown) {
             console.log("Tir du joueur !");
+
+            // jouer son
+            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
 
             this.lastShotAt = now;
             // positionner le projectile juste au-dessus du joueur
