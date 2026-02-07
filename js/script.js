@@ -1,10 +1,18 @@
 import Player from "./player.js";
-import Ennemi from "./ennemi.js";
 import { defineListeners, inputStates, clearInput } from "./ecouteurs.js";
 import { circRectsOverlapFromCenter } from "./collisionUtils.js";
 import { initStars, updateStars, drawDecoration } from "./decoration.js";
 import { loadAssets } from "./assetLoader.js";
 import { getLevelConfig, getMaxLevel } from "./levelConfig.js";
+import {
+    resetEnemyState,
+    updateSpawning,
+    updateEnemyProjectiles,
+    drawEnemyProjectiles,
+    enemyShoot,
+    isEnemyOffscreen,
+    isEnemyEscaped
+} from "./enemySystem.js";
 
 
 /* ###### Initialisation du jeu ###### */
@@ -14,22 +22,28 @@ window.onload = init;
 
 /* ###### Variables globales ###### */
 
+// éléments graphiques globaux
 let canvas, ctx;
 
+// objets du jeu
 let player, ennemis = [];
 
+// état du jeu
 let etat, score, niveau, nbVies, temps;
-const GAMEOVER_COOLDOWN_MS = 600; // durée du cooldown en ms
+const GAMEOVER_COOLDOWN_MS = 1000; // durée du cooldown en ms (éviter appuis involontaires)
 let gameOverCooldownUntil = 0;
 
-let projectiles = [];
-let levelConfig = null;
-const spawnState = {
+// éléments de jeu (en listes)
+let projectiles = [];       // projectiles du joueur
+let enemyProjectiles = [];  // projectiles ennemis (séparés pour faciliter gestion et collisions)
+let levelConfig = null;      // configuration du niveau en cours (spawn, scoring, etc.) chargé depuis levelConfig.js
+const spawnState = {    // état de la génération d'ennemis pour le niveau en cours
     spawned: 0,
     nextSpawnAt: 0
 };
 
-var assetsToLoadURLs = {
+// Assets du jeu
+var assetsToLoadURLs = { // TODO: @Maxime - mettre sons et images + chercher si pref local ou URL distant ?
     // Images
     press_start: { url: './assets/images/press_start.jpg' },
     vaisseau: { url: './assets/images/vaisseau.png' },
@@ -41,7 +55,7 @@ var assetsToLoadURLs = {
 };
 export let loadedAssets;
 
-/* Flags pour gestion propre des touches / boucle */
+// Flags pour gestion propre des touches (éviter rebonds au game over, etc.)
 let awaitingKeyRelease = false;
 let gameOverKeyListenerAttached = false;
 let loopStarted = false;
@@ -72,7 +86,6 @@ async function init() {
     startGame();
 }
 
-
 function startGame(goToHome = true) {
     console.log("Démarrage du jeu");
 
@@ -83,6 +96,7 @@ function startGame(goToHome = true) {
     // reset en cas de game over ou redémarrage
     ennemis = [];
     projectiles = [];
+    enemyProjectiles = [];
 
     // reset input tenu (important si touche était maintenue)
     clearInput();
@@ -190,8 +204,12 @@ function drawGameOver() {
     ctx.restore();
 }
 
+function drawMenuVictoire() {
+    // TODO: @Maxime Gérer écran de win avec réaffichage score et temps, stats, etc.
+}
+
 function drawJeu() {
-    // dessiner décor (étoiles etc.)
+    // dessiner décor (étoiles, etc.)
     drawDecoration(ctx, player, niveau, canvas);
 
     // dessiner infos (score, vies, niveau, temps)
@@ -200,12 +218,15 @@ function drawJeu() {
 
     // draw player
     player.draw(ctx);
-
     // draw projectiles
     projectiles.forEach(p => p.draw(ctx));
 
     // draw ennemis
-    drawEnemies();
+    ennemis.forEach(ennemi => {
+        ennemi.draw(ctx);
+    });
+    // draw projectiles ennemis
+    drawEnemyProjectiles(enemyProjectiles, ctx);
 }
 
 
@@ -230,133 +251,33 @@ function drawInfo() {
     ctx.restore();
 }
 
-function drawEnemies() {
-    ennemis.forEach(ennemi => {
-        ennemi.draw(ctx);
-    });
-}
-
+// Initialise le niveau : configuration, état de spawn, étoiles, etc.
+// depuis levelConfig.js et enemySystem.js
 function initLevel(level) {
     niveau = level;
     levelConfig = getLevelConfig(level);
-    ennemis = [];
-    spawnState.spawned = 0;
-    spawnState.nextSpawnAt = performance.now() + (levelConfig.spawn.initialDelayMs ?? 0);
+    resetEnemyState(ennemis, enemyProjectiles, spawnState, levelConfig);
     initStars(niveau, canvas);
 }
 
-function randBetween(min, max) {
-    return min + Math.random() * (max - min);
-}
-
-function randChoice(list) {
-    return list[Math.floor(Math.random() * list.length)];
-}
-
-function scheduleNextSpawn() {
-    const [minInterval, maxInterval] = levelConfig.spawn.intervalMs;
-    spawnState.nextSpawnAt = performance.now() + randBetween(minInterval, maxInterval);
-}
-
-function getSpawnPosition(edge, size) {
-    const margin = size / 2;
-    if (edge === "top") {
-        return { x: randBetween(margin, canvas.width - margin), y: -margin };
-    }
-    if (edge === "bottom") {
-        return { x: randBetween(margin, canvas.width - margin), y: canvas.height + margin };
-    }
-    if (edge === "left") {
-        return { x: -margin, y: randBetween(margin, canvas.height - margin) };
-    }
-    if (edge === "right") {
-        return { x: canvas.width + margin, y: randBetween(margin, canvas.height - margin) };
-    }
-    return { x: randBetween(margin, canvas.width - margin), y: -margin };
-}
-
-function spawnEnemyFromConfig(config) {
-    const edge = randChoice(config.spawn.edges);
-    const size = config.enemy.size;
-    const { x, y } = getSpawnPosition(edge, size);
-
-    const speed = randBetween(config.spawn.speed[0], config.spawn.speed[1]);
-    const driftX = config.spawn.driftX ?? [0, 0];
-    const driftY = config.spawn.driftY ?? [0, 0];
-
-    let vx = 0;
-    let vy = 0;
-    if (edge === "top") {
-        vx = randBetween(driftX[0], driftX[1]);
-        vy = speed;
-    } else if (edge === "bottom") {
-        vx = randBetween(driftX[0], driftX[1]);
-        vy = -speed;
-    } else if (edge === "left") {
-        vx = speed;
-        vy = randBetween(driftY[0], driftY[1]);
-    } else if (edge === "right") {
-        vx = -speed;
-        vy = randBetween(driftY[0], driftY[1]);
-    }
-
-    const options = {
-        ...config.enemy,
-        vx,
-        vy
-    };
-    ennemis.push(new Ennemi(x, y, options));
-}
-
-function updateSpawning() {
-    if (!levelConfig) return;
-    const totalToSpawn = levelConfig.spawn.totalToSpawn ?? Infinity;
-    if (spawnState.spawned >= totalToSpawn) return;
-    if (ennemis.length >= levelConfig.spawn.maxAlive) return;
-
-    const now = performance.now();
-    if (now >= spawnState.nextSpawnAt) {
-        spawnEnemyFromConfig(levelConfig);
-        spawnState.spawned += 1;
-        scheduleNextSpawn();
-    }
-}
-
-function isEnemyOffscreen(ennemi) {
-    const margin = Math.max(ennemi.width, ennemi.height);
-    return (
-        ennemi.x < -margin ||
-        ennemi.x > canvas.width + margin ||
-        ennemi.y < -margin ||
-        ennemi.y > canvas.height + margin
-    );
-}
-
-function isEnemyEscaped(ennemi, escapeSides) {
-    if (!escapeSides || escapeSides.length === 0) return false;
-    const margin = Math.max(ennemi.width, ennemi.height);
-    const escaped = {
-        left: ennemi.x + margin < 0,
-        right: ennemi.x - margin > canvas.width,
-        top: ennemi.y + margin < 0,
-        bottom: ennemi.y - margin > canvas.height
-    };
-    return escapeSides.some(side => escaped[side]);
-}
-
+// vérifier si le niveau est terminé (ennemis générés et éliminés)
+// et passer au suivant ou game over
 function handleLevelProgress() {
-    if (etat !== "RUNNING") return;
-    if (!levelConfig) return;
+    if (etat !== "RUNNING") return; // ne rien faire si pas en cours de jeu
+    if (!levelConfig) return; // ne rien faire si pas de config
+
+    // vérifier si tous les ennemis à générer ont été générés et éliminés
     const totalToSpawn = levelConfig.spawn.totalToSpawn ?? Infinity;
     if (spawnState.spawned < totalToSpawn) return;
     if (ennemis.length > 0) return;
 
+    // niveau terminé, passer au suivant ou win si c'était le dernier
     const maxLevel = getMaxLevel();
     if (niveau < maxLevel) {
         console.log("Niveau suivant : " + (niveau + 1));
         initLevel(niveau + 1);
     } else {
-        startGameOverSequence();
+        startGameOverSequence(); // TODO: @Maxime Gérer écran de win avec réaffichage score et temps (stats)
         console.log("Vous avez gagné !");
     }
 }
@@ -364,7 +285,7 @@ function handleLevelProgress() {
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
-//TODO: méthode à optimisé/découper
+//TODO: @Mathieu méthode à optimisé/découper
 function updateGameState() {
     if (etat === "RUNNING") {
         // mettre à jour les étoiles
@@ -386,8 +307,11 @@ function updateGameState() {
             }
         }
 
+        // mettre à jour les projectiles ennemis
+        updateEnemyProjectiles(enemyProjectiles, canvas);
+
         // générer des ennemis de manière continue selon le niveau
-        updateSpawning();
+        updateSpawning({ ennemis, spawnState, levelConfig, canvas });
 
         // définir points selon le niveau
         const hitPoints = levelConfig?.scoring?.hitPoints ?? 10;
@@ -400,14 +324,17 @@ function updateGameState() {
             const ennemi = ennemis[ei];
 
             // déplacer l'ennemi (conserve le comportement existant)
-            ennemi.move();
+            ennemi.move({ x: player.x, y: player.y });
 
-            // si l'ennemi sort de l'écran -> pénalité éventuelle et suppression
-            if (isEnemyOffscreen(ennemi)) {
+            // tir ennemi (si capacité)
+            enemyShoot(ennemi, enemyProjectiles);
+
+            // si l'ennemi sort de l'écran -> pénalité et suppression
+            if (isEnemyOffscreen(ennemi, canvas)) {
                 console.log("Ennemi sorti de l'écran !");
 
                 // retirer l'ennemi et appliquer pénalité selon le niveau
-                if (isEnemyEscaped(ennemi, levelConfig?.escapeSides)) {
+                if (isEnemyEscaped(ennemi, canvas, levelConfig?.escapeSides)) {
                     score -= missPenalty;
                     if (score < 0) score = 0;
                 }
@@ -465,6 +392,22 @@ function updateGameState() {
             }
         }
 
+        // collisions projectiles ennemis -> joueur
+        for (let epi = enemyProjectiles.length - 1; epi >= 0; epi--) {
+            const p = enemyProjectiles[epi];
+            if (circRectsOverlapFromCenter(
+                p.x, p.y, p.width / 2, p.height / 2,
+                player.x, player.y, player.width / 2, player.height / 2
+            )) {
+                enemyProjectiles.splice(epi, 1);
+                nbVies -= 1;
+                if (nbVies <= 0) {
+                    startGameOverSequence();
+                    console.log("Game Over !");
+                }
+            }
+        }
+
         // vérifier si le niveau est terminé
         handleLevelProgress();
     }
@@ -472,6 +415,7 @@ function updateGameState() {
 
 function startGameOverSequence() {
     if (gameOverKeyListenerAttached) return; // déjà en attente
+
     // poser l'état et préparer le cooldown
     etat = "GAMEOVER";
     gameOverCooldownUntil = performance.now() + GAMEOVER_COOLDOWN_MS;
@@ -481,20 +425,21 @@ function startGameOverSequence() {
     // vider les entrées immédiatement pour éviter rebonds
     clearInput();
 
-    // demander d'abord un keyup (libération de la touche déjà maintenue)
+    // demander d'abord un keyup (pr libération de la touche déjà maintenue)
     window.addEventListener('keyup', onGameOverKeyUp, { once: true });
 }
 
 function onGameOverKeyUp() {
-    // libération détectée : maintenant on écoute keydown mais on ignore tant que cooldown non écoulé
+    // libération touche -> on écoute keydown mais ignore tant que cooldown non écoulé
     awaitingKeyRelease = false;
     window.removeEventListener('keyup', onGameOverKeyUp);
-    // on attache sans { once: true } pour pouvoir filtrer les keydown prématurés
+
+    // sans { once: true } pour filtrer les keydown prématurés
     window.addEventListener('keydown', onGameOverKeyDown);
 }
 
 function onGameOverKeyDown() {
-    // si cooldown toujours actif, on ignore l'appui
+    // si cooldown toujours actif -> on ignore l'appui
     if (performance.now() < gameOverCooldownUntil) {
         return;
     }

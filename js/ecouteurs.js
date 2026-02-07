@@ -39,6 +39,7 @@ export function defineListeners() {
     });
 }
 
+// réinitialiser tous les états d'entrée à false (ex: qd game over)
 export function clearInput() {
     for (const k in inputStates) {
         if (Object.prototype.hasOwnProperty.call(inputStates, k)) inputStates[k] = false;

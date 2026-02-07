@@ -1,67 +1,104 @@
+
+// configuration des niveaux du jeu
+// ennemis, spawn, scoring, etc.
 const LEVEL_CONFIGS = {
+    // niveau 1
     1: {
+        // TODO: @Maxime - changer shape/color par png ennemis
         enemy: {
             shape: "triangle",
             color: "#e74c3c",
             size: 30,
-            pattern: "straight"
+            pattern: "straight" // pattern de déplacement simple (ligne droite)
         },
-        spawn: {
-            intervalMs: [400, 900],
-            initialDelayMs: 0,
-            maxAlive: 6,
-            totalToSpawn: 20,
-            edges: ["top"],
-            speed: [1.2, 2.0],
-            driftX: [-0.4, 0.4]
+        spawn: { // spawn simple
+            intervalMs: [350, 800],     // temps entre les spawns (min, max)
+            initialDelayMs: 0,          // délai avant le premier spawn
+            maxAlive: 8,                // nombre max d'ennemis à l'écran en même temps
+            totalToSpawn: 45,
+            edges: ["top"],             // apparition que par le haut
+            speed: [1.3, 2.3],
+            driftX: [-0.5, 0.5]         // légère dérive sur les côtés
         },
         scoring: {
-            hitPoints: 10,
-            missPenalty: 5
+            hitPoints: 10,              // points gagnés par ennemi touché
+            missPenalty: 5              // points perdus par ennemi échappé
         },
-        escapeSides: ["bottom"]
+        escapeSides: ["bottom"]         // perte de points si l'ennemi sort par le bas
     },
+    // niveau 2
     2: {
+        // TODO: @Maxime - changer shape/color par png ennemis
         enemy: {
             shape: "square",
             color: "#3498db",
             size: 28,
             pattern: "straight"
         },
-        spawn: {
-            intervalMs: [350, 800],
+        spawn: { // spawn par vagues et formations
+            intervalMs: [420, 900],
             initialDelayMs: 0,
-            maxAlive: 7,
-            totalToSpawn: 24,
-            edges: ["left", "right"],
-            speed: [1.3, 2.3],
-            driftY: [0.2, 0.8]
+            maxAlive: 8,
+            totalToSpawn: 40,
+            edges: ["top"],
+            speed: [1.2, 2.0],
+            driftX: [-0.4, 0.4],
+            formations: [
+                { type: "single", weight: 50 }, // 50% chance de spawn simple
+                { type: "square", weight: 25 }, // 25% chance de spawn en formation carrée
+                { type: "line", weight: 25 }    // 25% chance de spawn en formation linéaire
+            ]
         },
         scoring: {
             hitPoints: 15,
             missPenalty: 7
         },
-        escapeSides: ["left", "right"]
+        escapeSides: ["bottom"]
     },
+    // niveau 3
     3: {
-        enemy: {
-            shape: "circle",
-            color: "#2ecc71",
-            size: 26,
-            pattern: "zigzag",
-            zigzag: {
-                amplitude: 35,
-                frequency: 0.08,
-                axis: "x"
+        // plusieurs types d'ennemis avec patterns de déplacement différents
+        enemyMix: [
+            // 70% de chance : ennemi qui zigzag
+            {
+                weight: 70,
+                // TODO: @Maxime - changer shape/color par png ennemis
+                enemy: {
+                    shape: "square",
+                    color: "#3498db",
+                    size: 28,
+                    pattern: "zigzag",
+                    zigzag: {
+                        amplitude: 28,
+                        frequency: 0.08,
+                        axis: "x" // horizontalement
+                    }
+                }
+            },
+            // 30% de chance : ennemi simple + tire des projectiles
+            {
+                weight: 30,
+                // TODO: @Maxime - changer shape/color par png ennemis
+                enemy: {
+                    shape: "circle",
+                    color: "#2ecc71",
+                    size: 26,
+                    pattern: "straight",
+                    canShoot: true,
+                    shotCooldownMs: 1500, // tire toutes les 1.5 sec
+                    projectileSpeed: 3.8,
+                    projectileColor: "#FF0000", // rouge
+                    homingStrength: 0.035
+                }
             }
-        },
+        ],
         spawn: {
-            intervalMs: [300, 700],
+            intervalMs: [320, 720],
             initialDelayMs: 0,
-            maxAlive: 8,
-            totalToSpawn: 30,
+            maxAlive: 9,
+            totalToSpawn: 55,
             edges: ["top"],
-            speed: [1.4, 2.6],
+            speed: [1.5, 2.6],
             driftX: [-0.3, 0.3]
         },
         scoring: {
@@ -72,16 +109,20 @@ const LEVEL_CONFIGS = {
     }
 };
 
+// obtenir liste des niveaux dispo (order croissant)
 const LEVEL_ORDER = Object.keys(LEVEL_CONFIGS)
     .map(Number)
     .sort((a, b) => a - b);
 
+// fonction pour récupérer la config d'un niveau
 export function getLevelConfig(level) {
     return LEVEL_CONFIGS[level] || LEVEL_CONFIGS[LEVEL_ORDER[0]];
 }
 
+// fonction pour obtenir le prochain niveau
 export function getMaxLevel() {
     return LEVEL_ORDER[LEVEL_ORDER.length - 1] || 1;
 }
+
 
 export { LEVEL_CONFIGS };
