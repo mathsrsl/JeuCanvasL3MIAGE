@@ -17,36 +17,37 @@
 
 ## Shooter 2D Vertical
 
-Jeu **Shooter 2D vertical** développé en **JavaScript** avec **HTML5 Canvas**.
-Le joueur contrôle un vaisseau en bas de l’écran et doit détruire des ennemis descendant depuis le haut.
+Jeu **Space MIAGE** développé en **JavaScript** avec **HTML5 Canvas**.
+Le joueur contrôle un vaisseau et doit détruire des ennemis qui apparaissent en continu.
 
 ### Gameplay
 
-* Déplacement horizontal du vaisseau (gauche/droite)
-* Tir de projectiles pour éliminer les ennemis (haut ou espace)
-* Collision avec un ennemi : perte d’une vie
-* Ennemi atteignant le bas de l’écran : perte de score
-* Fin de partie lorsque toutes les vies sont perdues
+* Déplacement du vaisseau en 2D (gauche/droite/haut/bas) grâce aux touches directionnelles
+* Tir de projectiles vers le haut (espace) pour détruire les ennemis
+* Collision avec un ennemi ou un projectile ennemi -> perte d’une vie
+* Ennemi qui sort par le bas (non détruit)
+* Fin de partie lorsque toutes les vies sont perdues ou niveau suivant lorsque les vagues d’ennemis sont terminées
 
-### Score et Hi-Scores
+### Score
 
 * Des points sont gagnés en détruisant les ennemis
-* Les meilleurs scores sont sauvegardés localement et consultables via un écran dédié
+* Une pénalité est appliquée si un ennemi s’échappe par le bas
+* Les meilleurs scores sont sauvegardés localement et consultables via un écran dédié (localStorage)
 
 ### Niveaux
 
 Le jeu comporte **3 niveaux** à difficulté croissante :
 
-1. Ennemis lents et peu nombreux
-2. Ennemis plus rapides et plus fréquents
-3. Ennemis très rapides et vagues continues
+1. Ennemis lents, apparition uniquement par le haut
+2. Ennemis plus rapides, formations semi‑aléatoires (single, carré, ligne)
+3. Mix d’ennemis (≈70% type niveau 2 + ≈30% type niveau 3) avec zigzag, tirs ennemis et comportement à "tête-chercheuse" léger
 
 ### États du jeu
 
-* Menu principal
+* Menu principal avec règles et Hi-Scores
 * Jeu
 * Game Over
-* Hi-Scores
+* Win
 
 Chaque état est géré par une machine à états et rendu à **60 FPS** avec `requestAnimationFrame`.
 
