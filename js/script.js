@@ -282,6 +282,132 @@ function handleLevelProgress() {
     }
 }
 
+// mettre les projectiles à jour + supprimer ceux qui ne sont plus actifs (hors écran, collision, etc.)
+// player ou ennemis, d'après la liste passée en paramètre
+function updateProjectiles(list, canvas) {
+    for (let i = list.length - 1; i >= 0; i--) {
+        const p = list[i];
+        p.update(canvas);
+        if (!p.active) {
+            list.splice(i, 1);
+        }
+    }
+}
+
+function updatePlayerProjectiles() {
+    const newProj = player.updateFromInput(inputStates, canvas);
+    if (newProj) {
+        projectiles.push(newProj);
+    }
+    updateProjectiles(projectiles, canvas);
+}
+
+function loseLife() {
+    nbVies -= 1;
+    if (nbVies <= 0) {
+        startGameOverSequence();
+        console.log("Game Over !");
+    }
+}
+
+// détecte collisions entre projectiles joueur et ennemis
+function handleEnemyHitByProjectiles(ennemiIndex, ennemi, hitPoints) {
+    for (let pi = projectiles.length - 1; pi >= 0; pi--) {
+        const p = projectiles[pi];
+
+        // ignorer si plus actif
+        if (!p.active) continue;
+
+        // tester collision
+        if (circRectsOverlapFromCenter(
+            p.x, p.y, p.width / 2, p.height / 2,
+            ennemi.x, ennemi.y, ennemi.width, ennemi.height
+        )) {
+            // retirer
+            p.active = false;
+            projectiles.splice(pi, 1);
+            ennemis.splice(ennemiIndex, 1);
+
+            // jouer son
+            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+
+            // augmenter le score
+            score += hitPoints;
+
+            return true;
+        }
+    }
+    return false;
+}
+
+// détecte collisions entre joueur et ennemi
+function handlePlayerEnemyCollision(ennemiIndex, ennemi) {
+    if (circRectsOverlapFromCenter(
+        player.x, player.y, player.width / 2, player.height / 2,
+        ennemi.x, ennemi.y, ennemi.width, ennemi.height
+    )) {
+        // jouer son
+        if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+        ennemis.splice(ennemiIndex, 1);
+
+        // perdre une vie
+        loseLife();
+    }
+}
+
+// mettre à jour les ennemis -> déplacement, tirs, collisions avec projectiles et joueur, etc.
+function updateEnemies(hitPoints, missPenalty) {
+    for (let ei = ennemis.length - 1; ei >= 0; ei--) {
+        const ennemi = ennemis[ei];
+
+        // déplacer et tirer selon le pattern de l'ennemi
+        ennemi.move({ x: player.x, y: player.y });
+        enemyShoot(ennemi, enemyProjectiles);
+
+        // vérifier si ennemi sorti de l'écran
+        if (isEnemyOffscreen(ennemi, canvas)) {
+            console.log("Ennemi sorti de l'écran !");
+
+            if (isEnemyEscaped(ennemi, canvas, levelConfig?.escapeSides)) {
+                score -= missPenalty;
+                if (score < 0) score = 0;
+            }
+            ennemis.splice(ei, 1);
+            continue;
+        }
+
+        // vérifier collisions avec projectiles du joueur
+        if (handleEnemyHitByProjectiles(ei, ennemi, hitPoints)) {
+            continue;
+        }
+
+        // vérifier collisions avec le joueur
+        handlePlayerEnemyCollision(ei, ennemi);
+    }
+}
+
+// détecte collisions entre projectiles ennemis et joueur
+function handleEnemyProjectilesCollision() {
+    for (let epi = enemyProjectiles.length - 1; epi >= 0; epi--) {
+        const p = enemyProjectiles[epi];
+
+        if (circRectsOverlapFromCenter(
+            p.x, p.y, p.width / 2, p.height / 2,
+            player.x, player.y, player.width / 2, player.height / 2
+        )) {
+            // retirer projectile
+            enemyProjectiles.splice(epi, 1);
+
+            // jouer son
+            // TODO: @Maxime - changer son ici (joueur se fait toucher / son différent de celui du tir)
+            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+
+            // perdre une vie
+            loseLife();
+        }
+    }
+}
+
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
@@ -291,23 +417,7 @@ function updateGameState() {
         // mettre à jour les étoiles
         updateStars(player, niveau, canvas);
 
-        // mettre à jour état du joueur et ennemis (position, tirs, etc.)
-        const newProj = player.updateFromInput(inputStates, canvas);
-        if (newProj) {
-            projectiles.push(newProj);
-        }
-
-        // mettre à jour les projectiles
-        // on met à jour et on purge en une passe (itération arrière pour pouvoir splice)
-        for (let pi = projectiles.length - 1; pi >= 0; pi--) {
-            const p = projectiles[pi];
-            p.update(canvas);
-            if (!p.active) {
-                projectiles.splice(pi, 1);
-            }
-        }
-
-        // mettre à jour les projectiles ennemis
+        updatePlayerProjectiles();
         updateEnemyProjectiles(enemyProjectiles, canvas);
 
         // générer des ennemis de manière continue selon le niveau
@@ -318,95 +428,8 @@ function updateGameState() {
         const missPenalty = levelConfig?.scoring?.missPenalty ?? 5;
 
 
-        // collision projectile-ennemi
-        // itération arrière sur ennemis pour pouvoir supprimer sans problème d'index
-        for (let ei = ennemis.length - 1; ei >= 0; ei--) {
-            const ennemi = ennemis[ei];
-
-            // déplacer l'ennemi (conserve le comportement existant)
-            ennemi.move({ x: player.x, y: player.y });
-
-            // tir ennemi (si capacité)
-            enemyShoot(ennemi, enemyProjectiles);
-
-            // si l'ennemi sort de l'écran -> pénalité et suppression
-            if (isEnemyOffscreen(ennemi, canvas)) {
-                console.log("Ennemi sorti de l'écran !");
-
-                // retirer l'ennemi et appliquer pénalité selon le niveau
-                if (isEnemyEscaped(ennemi, canvas, levelConfig?.escapeSides)) {
-                    score -= missPenalty;
-                    if (score < 0) score = 0;
-                }
-                ennemis.splice(ei, 1);
-
-                continue; // ennemi traité, passer au suivant
-            }
-
-            // vérifier collision avec projectiles (itération arrière sur projectiles pour splice sûr)
-            let touched = false;
-            for (let pi = projectiles.length - 1; pi >= 0; pi--) {
-                const p = projectiles[pi];
-                if (!p.active) continue;
-                if (circRectsOverlapFromCenter(
-                    p.x, p.y, p.width / 2, p.height / 2,
-                    ennemi.x, ennemi.y, ennemi.width, ennemi.height
-                )) {
-                    // désactiver projectile et supprimer ennemi
-                    p.active = false;
-                    projectiles.splice(pi, 1);
-                    ennemis.splice(ei, 1);
-                    touched = true;
-
-                    // jouer son, ajouter score
-                    if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
-                    score += hitPoints;
-
-                    break;
-                }
-            }
-            if (touched) continue; // ennemi déjà retiré, passer au suivant
-
-            // detecter collisions joueur-ennemis
-            // pour le joueur on a un cercle, pour l'ennemi un rectangle
-            // la largeur du joueur = deux fois le rayon, on passe donc la moitié de la largeur
-            // comme rayon.
-            if (circRectsOverlapFromCenter(player.x, player.y, player.width/2, player.height/2,
-                ennemi.x, ennemi.y, ennemi.width, ennemi.height)) {
-                console.log("Collision joueur-ennemi détectée !");
-
-                // jouer son de collision
-                loadedAssets.plop.play();
-
-                // Tuer l'ennemi (retirer de la liste)
-                ennemis.splice(ei, 1);
-
-                // Décrémenter le nombre de vies
-                nbVies -= 1;
-
-                // si plus de vies, GAMEOVER
-                if (nbVies <= 0) {
-                    startGameOverSequence();
-                    console.log("Game Over !");
-                }
-            }
-        }
-
-        // collisions projectiles ennemis -> joueur
-        for (let epi = enemyProjectiles.length - 1; epi >= 0; epi--) {
-            const p = enemyProjectiles[epi];
-            if (circRectsOverlapFromCenter(
-                p.x, p.y, p.width / 2, p.height / 2,
-                player.x, player.y, player.width / 2, player.height / 2
-            )) {
-                enemyProjectiles.splice(epi, 1);
-                nbVies -= 1;
-                if (nbVies <= 0) {
-                    startGameOverSequence();
-                    console.log("Game Over !");
-                }
-            }
-        }
+        updateEnemies(hitPoints, missPenalty);
+        handleEnemyProjectilesCollision();
 
         // vérifier si le niveau est terminé
         handleLevelProgress();
