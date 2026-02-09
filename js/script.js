@@ -411,7 +411,6 @@ function handleEnemyProjectilesCollision() {
 
 /* ###### Mise à jour de l'état du jeu ###### */
 
-//TODO: @Mathieu méthode à optimisé/découper
 function updateGameState() {
     if (etat === "RUNNING") {
         // mettre à jour les étoiles
