@@ -1,25 +1,35 @@
 <html lang="fr">
     <head>
-        <title>Jeu Canvas - Space MIAGE</title>
+        <title>Space MIAGE (Jeu Canvas)</title>
         <link rel="stylesheet" href="./css/styles.css">
         <meta charset="UTF-8">
     </head>
     <body>
-        <h1 class="titreJeu">Space MIAGE</h1>
-
-        <!-- TODO: @Maxime - remplacer nombre vie par png coeur ? -->
-        <div class="contenu-infos-jeu">
-            <p class="infos-jeu">Score : 0</p>
-            <p class="infos-jeu">Niveau : 0</p>
-            <p class="infos-jeu">Vies : 0</p>
-            <p class="infos-jeu">Temps : 0s</p>
-        </div>
-
         <!-- TODO: @Maxime - rajouter règles/infos rapide sur les cotés ?
                 + par exemple image des touches à utiliser ? -->
+        <div class="container-gauche-ecran">
+            <div class="container-explication-jeu"></div>
+            <div class="container-touches"></div>
+        </div>
 
-        <div>
-            <canvas id="monCanvas" width="500" height="500"></canvas>
+        <div class="container-centre-ecran">
+            <div class="container-titre">
+                <h1 class="titreJeu">Space MIAGE</h1>
+            </div>
+            <div class="container-infos-jeu">
+                <!-- TODO: @Maxime - remplacer nombre vie par png coeur ? -->
+                <p class="infos-jeu">Score : 0</p>
+                <p class="infos-jeu">Niveau : 0</p>
+                <p class="infos-jeu">Vies : 0</p>
+                <p class="infos-jeu">Temps : 0s</p>
+            </div>
+            <div class="container-jeu">
+                <canvas id="monCanvas" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        <div class="container-droite-ecran">
+            <div class="container-score"></div>
         </div>
 
         <!-- Point d'entrée du JS -->

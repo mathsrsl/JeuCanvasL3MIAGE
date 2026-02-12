@@ -47,7 +47,7 @@ var assetsToLoadURLs = { // TODO: @Maxime - mettre sons et images + chercher si 
     // Images
     press_start: { url: './assets/images/press_start.jpg' },
     vaisseau: { url: './assets/images/vaisseau.png' },
-    ennemi: { url: './assets/images/ennemi.png' },
+    ennemi_1: { url: './assets/images/ennemi_1.png' },
 
     // Sons
     plop: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3', buffer: false, loop: false, volume: 1.0 },
@@ -77,7 +77,9 @@ async function init() {
     /* Création des objets du jeu */
 
     // création joueur
-    player = new Player(250, 450, loadedAssets.vaisseau);
+    player = new Player(canvas.width/2, canvas.height/2, loadedAssets.vaisseau);
+    
+    console.log(canvas.width, canvas.height);
 
     // définir listeners de gameplay (idempotent)
     defineListeners();
