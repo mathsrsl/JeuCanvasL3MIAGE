@@ -474,3 +474,5 @@ function onGameOverKeyDown() {
     clearInput();
     startGame(false);
 }
+
+//TODO: @Maxime - voir TODO du README ! (ne s'affiche pas dans la liste des TODO)
