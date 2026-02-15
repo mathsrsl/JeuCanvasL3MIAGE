@@ -54,11 +54,11 @@ Résumé des niveaux :
 
 Le code est découpé en plusieurs fichiers JS avec un **game loop** central et des systèmes dédiés :
 
-* `js/script.js` : boucle principale, états du jeu (`HOME`, `RUNNING`, `GAMEOVER`), collisions, scoring
+* `js/script.js` : boucle principale, états du jeu (`HOME`, `RUNNING`, `GAMEOVER`, `VICTORY`), collisions, scoring
 * `js/enemySystem.js` : génération des ennemis, formations, tirs ennemis, et règles générales de déplacement
-* `js/levelConfig.js` : configuration par niveau (spawn, scoring, patterns). Modification facile pour ajuster la difficulté ou les paramètres de jeu
+* `js/levelConfig.js` : configuration par niveau (spawn, scoring, patterns, sprites). Modification facile pour ajuster la difficulté ou les paramètres de jeu
 * `js/player.js` : création et déplacement joueur + tir
-* `js/ennemi.js` : création et comportement ennemi (zigzag, homing, tir)
+* `js/ennemi.js` : création et comportement ennemi (zigzag, homing, tir). Support des sprites PNG
 * `js/projectile.js` : gestion projectiles joueur ou ennemi
 * `js/ecouteurs.js` : gestion des entrées clavier
 * `js/collisionUtils.js` : fonctions de collision (issue de l'exemple de cours)
@@ -69,8 +69,12 @@ Le code est découpé en plusieurs fichiers JS avec un **game loop** central et 
 
 * Configuration des niveaux centralisée pour ajuster la difficulté sans toucher au gameplay *(levelConfig.js)*
 * Boucle de jeu stable via `requestAnimationFrame` et non `setInterval`
-* Suppression sécurisée des éléments via itérations inverses (pour éviter les problèmes d’index lors de la suppression d’ennemis ou projectiles)
+* Suppression sécurisée des éléments via itérations inverses (pour éviter les problèmes d'index lors de la suppression d'ennemis ou projectiles)
 * Séparation claire entre logique (spawn, collisions) et rendu (draw)
+* Système de cooldown pour éviter les actions involontaires (game over, victoire)
+* Utilisation de sprites PNG pour les ennemis avec fallback sur formes géométriques
+* Sons différenciés (tir, explosion, musique de fond)
+* Écran de victoire avec statistiques détaillées et système de bonus
 
 ### Technologies
 
@@ -80,10 +84,15 @@ Le code est découpé en plusieurs fichiers JS avec un **game loop** central et 
 
 ### Ressources externes
 
-**TODO:** @Maxime - à actualiser une fois fini (meme si les fichiers sont en local)
-
-* Sons :
-  * plop.mp3 : https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3
-  * humbug.mp3 : https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3
+* Sons (tous en local dans `assets/sons/`) :
+  * `tir.mp3` : son de tir d'ennemi et de joueur
+  * `explosion` : son de destruction d'ennemi et de joueur
+  * `musique.mp3` : musique de fond
+* Images (toutes en local dans `assets/images/`) :
+  * `vaisseau.png` : sprite du joueur
+  * `ennemi_1., 2.png, ennemi_3.png, ennemi_4.png` : sprite des ennemis
+  * `press_start.jpg` : écran d'accueil
 * Bibliothèque audio :
   * Howler.js (CDN) : https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.1/howler.min.js
+
+---

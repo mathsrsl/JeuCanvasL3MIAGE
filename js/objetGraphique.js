@@ -1,9 +1,8 @@
 export default class ObjetGraphique {height;
 
-    constructor(x, y, width, height, color = "black", illustration = null) {
+    constructor(x, y, width, height, illustration = null) {
         this.x = x;
         this.y = y;
-        this.color = color;
         this.illustration = illustration;
         this.width = width;
         this.height = height;
@@ -23,13 +22,11 @@ export default class ObjetGraphique {height;
                 );
             } catch (e) {
                 ctx.beginPath();
-                ctx.fillStyle = this.color;
                 ctx.arc(this.x, this.y, Math.min(this.width, this.height) / 2, 0, 2 * Math.PI);
                 ctx.fill();
             }
         } else {
             ctx.beginPath();
-            ctx.fillStyle = this.color;
             ctx.arc(this.x, this.y, Math.min(this.width, this.height) / 2, 0, 2 * Math.PI);
             ctx.fill();
         }

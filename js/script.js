@@ -29,7 +29,8 @@ let canvas, ctx;
 let player, ennemis = [];
 
 // état du jeu
-let etat, score, niveau, nbVies, temps;
+let etat, score, niveau, nbVies, temps, tempsDebut, tempsFin;
+let meilleurScore = parseInt(localStorage.getItem('meilleurScore')) || 0;
 const GAMEOVER_COOLDOWN_MS = 1000; // durée du cooldown en ms (éviter appuis involontaires)
 let gameOverCooldownUntil = 0;
 
@@ -43,15 +44,19 @@ const spawnState = {    // état de la génération d'ennemis pour le niveau en 
 };
 
 // Assets du jeu
-var assetsToLoadURLs = { // TODO: @Maxime - mettre sons et images + chercher si pref local ou URL distant ?
+var assetsToLoadURLs = {
     // Images
     press_start: { url: './assets/images/press_start.jpg' },
     vaisseau: { url: './assets/images/vaisseau.png' },
     ennemi_1: { url: './assets/images/ennemi_1.png' },
+    ennemi_2: { url: './assets/images/ennemi_2.png' },
+    ennemi_3: { url: './assets/images/ennemi_3.png' },
+    ennemi_4: { url: './assets/images/ennemi_4.png' },
 
     // Sons
-    plop: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/plop.mp3', buffer: false, loop: false, volume: 1.0 },
-    humbug: { url: 'https://mainline.i3s.unice.fr/mooc/SkywardBound/assets/sounds/humbug.mp3', buffer: true, loop: true, volume: 1.0, isPlaying: undefined },
+    tir: { url: './assets/sons/tir.mp3', buffer: false, loop: false, volume: 0.5 },
+    explosion: { url: './assets/sons/explosion.mp3', buffer: false, loop: false, volume: 0.5 },
+    humbug: { url: './assets/sons/musique.mp3', buffer: true, loop: true, volume: 0.2, isPlaying: undefined },
 };
 export let loadedAssets;
 
@@ -84,6 +89,12 @@ async function init() {
     // définir listeners de gameplay (idempotent)
     defineListeners();
 
+    // Afficher le meilleur score initial
+    const meilleurScoreElement = document.querySelector('.meilleur-score-valeur');
+    if (meilleurScoreElement) {
+        meilleurScoreElement.textContent = meilleurScore;
+    }
+
     /* Démarrage du jeu — boucle d'animation */
     startGame();
 }
@@ -94,6 +105,8 @@ function startGame(goToHome = true) {
     // initialisation des variables du jeu
     score = 0;
     nbVies = 3;
+    tempsDebut = performance.now();
+    tempsFin = null;
 
     // reset en cas de game over ou redémarrage
     ennemis = [];
@@ -139,6 +152,8 @@ function gameLoop() {
         drawJeu();
     } else if (etat === "GAMEOVER") {
         drawGameOver();
+    } else if (etat === "VICTORY") {
+        drawMenuVictoire();
     }
 
     // 3 - on met à jour l'état du jeu (position des objets, etc.)
@@ -207,7 +222,68 @@ function drawGameOver() {
 }
 
 function drawMenuVictoire() {
-    // TODO: @Maxime Gérer écran de win avec réaffichage score et temps, stats, etc.
+    ctx.save();
+
+    // Fond semi-transparent
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Titre de victoire
+    ctx.fillStyle = "#1EF604FF";
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("🏆 VICTOIRE ! 🏆", canvas.width / 2, canvas.height / 2 - 120);
+
+    // Statistiques - utiliser tempsFin au lieu de performance.now()
+    const tempsTotal = Math.floor((tempsFin - tempsDebut) / 1000);
+    const minutes = Math.floor(tempsTotal / 60);
+    const secondes = tempsTotal % 60;
+    
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+    ctx.fillText(`Score Final : ${score}`, canvas.width / 2, canvas.height / 2 - 50);
+    ctx.fillText(`Temps Total : ${minutes}m ${secondes}s`, canvas.width / 2, canvas.height / 2 - 10);
+    ctx.fillText(`Vies Restantes : ${nbVies}`, canvas.width / 2, canvas.height / 2 + 30);
+    
+    // Bonus pour vies restantes
+    const bonus = nbVies * 50;
+    if (bonus > 0) {
+        ctx.fillStyle = "#FFD700";
+        ctx.fillText(`Bonus vies : +${bonus} pts`, canvas.width / 2, canvas.height / 2 + 70);
+        ctx.fillStyle = "white";
+        ctx.font = "bold 28px Arial";
+        ctx.fillText(`TOTAL : ${score + bonus}`, canvas.width / 2, canvas.height / 2 + 110);
+    }
+
+    // Instructions
+    ctx.font = "20px Arial";
+    ctx.fillStyle = "#1EF604FF";
+    ctx.fillText("Appuyez sur une touche pour rejouer", canvas.width / 2, canvas.height / 2 + 160);
+
+    // Attacher le mécanisme de redémarrage
+    if (!gameOverKeyListenerAttached) {
+        awaitingKeyRelease = true;
+        window.addEventListener('keyup', onVictoryKeyUp, { once: true });
+        gameOverKeyListenerAttached = true;
+    }
+
+    ctx.restore();
+}
+
+function onVictoryKeyUp() {
+    awaitingKeyRelease = false;
+    window.removeEventListener('keyup', onVictoryKeyUp);
+    window.addEventListener('keydown', onVictoryKeyDown);
+}
+
+function onVictoryKeyDown() {
+    if (performance.now() < gameOverCooldownUntil) {
+        return;
+    }
+    window.removeEventListener('keydown', onVictoryKeyDown);
+    gameOverKeyListenerAttached = false;
+    clearInput();
+    startGame(false);
 }
 
 function drawJeu() {
@@ -248,7 +324,24 @@ function drawInfo() {
     scoreP.textContent = "Score : " + score;
     viesP.textContent = "Vies : " + nbVies;
     niveauP.textContent = "Niveau : " + niveau;
-    tempsP.textContent = "Temps : " + Math.floor(performance.now() / 1000) + " s";
+    
+    // Calculer le temps écoulé depuis le début de la partie
+    // Utiliser tempsFin si le jeu est terminé, sinon utiliser le temps actuel
+    const tempsActuel = tempsFin ? tempsFin : performance.now();
+    const tempsEcoule = Math.floor((tempsActuel - (tempsDebut || tempsActuel)) / 1000);
+    tempsP.textContent = "Temps : " + tempsEcoule + " s";
+
+    // Afficher le meilleur score
+    const meilleurScoreElement = document.querySelector('.meilleur-score-valeur');
+    if (meilleurScoreElement) {
+        meilleurScoreElement.textContent = meilleurScore;
+    }
+
+    // Mettre à jour le meilleur score si nécessaire
+    if (score > meilleurScore) {
+        meilleurScore = score;
+        localStorage.setItem('meilleurScore', meilleurScore);
+    }
 
     ctx.restore();
 }
@@ -279,9 +372,31 @@ function handleLevelProgress() {
         console.log("Niveau suivant : " + (niveau + 1));
         initLevel(niveau + 1);
     } else {
-        startGameOverSequence(); // TODO: @Maxime Gérer écran de win avec réaffichage score et temps (stats)
+        startVictorySequence();
         console.log("Vous avez gagné !");
     }
+}
+
+function startVictorySequence() {
+    if (gameOverKeyListenerAttached) return;
+    
+    // Enregistrer le temps de fin
+    tempsFin = performance.now();
+    
+    // Mettre à jour le meilleur score si nécessaire
+    const scoreAvecBonus = score + (nbVies * 50);
+    if (scoreAvecBonus > meilleurScore) {
+        meilleurScore = scoreAvecBonus;
+        localStorage.setItem('meilleurScore', meilleurScore);
+    }
+    
+    etat = "VICTORY";
+    gameOverCooldownUntil = performance.now() + GAMEOVER_COOLDOWN_MS;
+    awaitingKeyRelease = true;
+    gameOverKeyListenerAttached = true;
+    clearInput();
+    
+    window.addEventListener('keyup', onVictoryKeyUp, { once: true });
 }
 
 // mettre les projectiles à jour + supprimer ceux qui ne sont plus actifs (hors écran, collision, etc.)
@@ -331,7 +446,7 @@ function handleEnemyHitByProjectiles(ennemiIndex, ennemi, hitPoints) {
             ennemis.splice(ennemiIndex, 1);
 
             // jouer son
-            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+            if (loadedAssets && loadedAssets.explosion) loadedAssets.explosion.play();
 
             // augmenter le score
             score += hitPoints;
@@ -348,8 +463,8 @@ function handlePlayerEnemyCollision(ennemiIndex, ennemi) {
         player.x, player.y, player.width / 2, player.height / 2,
         ennemi.x, ennemi.y, ennemi.width, ennemi.height
     )) {
-        // jouer son
-        if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+        // jouer son de explosion (joueur touché)
+        if (loadedAssets && loadedAssets.explosion) loadedAssets.explosion.play();
         ennemis.splice(ennemiIndex, 1);
 
         // perdre une vie
@@ -400,9 +515,8 @@ function handleEnemyProjectilesCollision() {
             // retirer projectile
             enemyProjectiles.splice(epi, 1);
 
-            // jouer son
-            // TODO: @Maxime - changer son ici (joueur se fait toucher / son différent de celui du tir)
-            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+            // jouer son de explosion (joueur touché)
+            if (loadedAssets && loadedAssets.explosion) loadedAssets.explosion.play();
 
             // perdre une vie
             loseLife();
@@ -440,6 +554,15 @@ function updateGameState() {
 function startGameOverSequence() {
     if (gameOverKeyListenerAttached) return; // déjà en attente
 
+    // Enregistrer le temps de fin
+    tempsFin = performance.now();
+    
+    // Mettre à jour le meilleur score si nécessaire
+    if (score > meilleurScore) {
+        meilleurScore = score;
+        localStorage.setItem('meilleurScore', meilleurScore);
+    }
+
     // poser l'état et préparer le cooldown
     etat = "GAMEOVER";
     gameOverCooldownUntil = performance.now() + GAMEOVER_COOLDOWN_MS;
@@ -474,5 +597,3 @@ function onGameOverKeyDown() {
     clearInput();
     startGame(false);
 }
-
-//TODO: @Maxime - voir TODO du README ! (ne s'affiche pas dans la liste des TODO)

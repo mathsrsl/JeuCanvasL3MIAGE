@@ -47,8 +47,8 @@ export default class Player extends ObjetGraphique {
         if (inputStates.space && now - this.lastShotAt >= this.shotCooldown) {
             console.log("Tir du joueur !");
 
-            // jouer son
-            if (loadedAssets && loadedAssets.plop) loadedAssets.plop.play();
+            // jouer son de tir
+            if (loadedAssets && loadedAssets.tir) loadedAssets.tir.play();
 
             this.lastShotAt = now;
             // positionner le projectile juste au-dessus du joueur

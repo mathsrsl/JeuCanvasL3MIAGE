@@ -5,11 +5,21 @@
         <meta charset="UTF-8">
     </head>
     <body>
-        <!-- TODO: @Maxime - rajouter règles/infos rapide sur les cotés ?
-                + par exemple image des touches à utiliser ? -->
         <div class="container-gauche-ecran">
-            <div class="container-explication-jeu"></div>
-            <div class="container-touches"></div>
+            <div class="container-explication-jeu">
+                <h2>🎮 Comment jouer ?</h2>
+                <div class="regles">
+                    <p><strong>Objectif :</strong> Détruire le plus d'ennemi et passer les 3 niveaux sans mourir !</p>
+                    <p><strong>Attention :</strong> Évitez les collisions et les projectiles ennemis !</p>
+                </div>
+            </div>
+            <div class="container-touches">
+                <h3>Contrôles</h3>
+                <div class="touche-info">
+                    <p>Z Q S D ou ⬆️⬇️⬅️➡️ Déplacement</p>
+                    <p>ESPACE : Tir</p>
+                </div>
+            </div>
         </div>
 
         <div class="container-centre-ecran">
@@ -17,19 +27,33 @@
                 <h1 class="titreJeu">Space MIAGE</h1>
             </div>
             <div class="container-infos-jeu">
-                <!-- TODO: @Maxime - remplacer nombre vie par png coeur ? -->
                 <p class="infos-jeu">Score : 0</p>
                 <p class="infos-jeu">Niveau : 0</p>
                 <p class="infos-jeu">Vies : 0</p>
                 <p class="infos-jeu">Temps : 0s</p>
             </div>
             <div class="container-jeu">
-                <canvas id="monCanvas" width="400" height="400"></canvas>
+                <canvas id="monCanvas" width="500" height="500"></canvas>
             </div>
         </div>
 
         <div class="container-droite-ecran">
-            <div class="container-score"></div>
+            <div class="container-score">
+                <h2>🏆 Score</h2>
+                <div class="score-info">
+                    <p><strong>Points par ennemi :</strong></p>
+                    <p>Niveau 1 : +10 pts</p>
+                    <p>Niveau 2 : +15 pts</p>
+                    <p>Niveau 3 : +20 pts</p>
+                    <hr>
+                    <p><strong>Pénalités :</strong></p>
+                    <p>Ennemi échappé : -5/-7/-10 pts</p>
+                </div>
+            </div>
+            <div class="container-meilleur-score">
+                <h3>⭐ Meilleur Score</h3>
+                <p class="meilleur-score-valeur">0</p>
+            </div>
         </div>
 
         <!-- Point d'entrée du JS -->

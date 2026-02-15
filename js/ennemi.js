@@ -1,12 +1,18 @@
 import ObjetGraphique  from "./objetGraphique.js";
+import { loadedAssets } from "./script.js";
 
 export default class Ennemi extends ObjetGraphique {
     constructor(x, y, options = {}) {
 
         // déterminer taille et couleur de base (en fonction du niveau ou des options)
         const size = options.size ?? 30;
-        const color = options.color ?? "red";
-        super(x, y, size, size, color);
+        
+        // récupérer l'image si spécifiée
+        const illustration = (options.useImage && options.imageName && loadedAssets) 
+            ? loadedAssets[options.imageName] 
+            : null;
+        
+        super(x, y, size, size, illustration);
 
         // forme et pattern de mouvement (en fonction du niveau ou des options)
         this.shape = options.shape ?? "triangle";
@@ -39,33 +45,10 @@ export default class Ennemi extends ObjetGraphique {
 
     // dessiner l'ennemi selon le type
     draw(ctx) {
-        ctx.save();
-
-        ctx.translate(this.x, this.y);
-        if (this.shape === "triangle") { // triangle pointant vers la direction du mouvement
-            const angle = Math.atan2(this.vy, this.vx) - Math.PI / 2;
-            ctx.rotate(angle);
-            ctx.beginPath();
-            ctx.moveTo(0, this.height / 2);
-            ctx.lineTo(-this.height / 2, -this.height / 2);
-            ctx.lineTo(this.height / 2, -this.height / 2);
-            ctx.closePath();
-            ctx.fillStyle = this.color;
-            ctx.fill();
-        } else if (this.shape === "square") { // carré centré sur (x, y)
-            ctx.fillStyle = this.color;
-            ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-        } else if (this.shape === "circle") { // cercle centré sur (x, y)
-            ctx.beginPath();
-            ctx.fillStyle = this.color;
-            ctx.arc(0, 0, Math.min(this.width, this.height) / 2, 0, 2 * Math.PI);
-            ctx.fill();
-        } else { // par défaut, carré
-            ctx.fillStyle = this.color;
-            ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        // Si une image est disponible, utiliser la méthode de la classe parente
+        if (this.illustration) {
+            super.draw(ctx);
         }
-
-        ctx.restore();
     }
 
     // mettre à jour la position de l'ennemi selon son pattern de mouvement

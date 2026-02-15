@@ -6,6 +6,7 @@
 
 import Ennemi from "./ennemi.js";
 import Projectile from "./projectile.js";
+import { loadedAssets } from "./script.js";
 
 
 /* ##### Helpers génériques ##### */
@@ -298,6 +299,10 @@ export function enemyShoot(ennemi, enemyProjectiles) {
 
     // tirer
     ennemi.lastShotAt = now;    // update timestamp du dernier tir
+    
+    // jouer son de tir ennemi
+    if (loadedAssets && loadedAssets.tir) loadedAssets.tir.play();
+    
     const projX = ennemi.x;
     const projY = ennemi.y + ennemi.height / 2 + 6; // tir depuis centre de l'ennemi
     const projectile = new Projectile( // créer le projectile avec paramètres de l'ennemi

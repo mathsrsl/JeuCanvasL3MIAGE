@@ -4,10 +4,9 @@
 const LEVEL_CONFIGS = {
     // niveau 1
     1: {
-        // TODO: @Maxime - changer shape/color par png ennemis
         enemy: {
-            shape: "triangle",
-            color: "#e74c3c",
+            useImage: true,
+            imageName: "ennemi_1",
             size: 30,
             pattern: "straight" // pattern de déplacement simple (ligne droite)
         },
@@ -28,10 +27,9 @@ const LEVEL_CONFIGS = {
     },
     // niveau 2
     2: {
-        // TODO: @Maxime - changer shape/color par png ennemis
         enemy: {
-            shape: "square",
-            color: "#3498db",
+            useImage: true,
+            imageName: "ennemi_2",
             size: 28,
             pattern: "straight"
         },
@@ -62,10 +60,9 @@ const LEVEL_CONFIGS = {
             // 70% de chance : ennemi qui zigzag
             {
                 weight: 70,
-                // TODO: @Maxime - changer shape/color par png ennemis
                 enemy: {
-                    shape: "square",
-                    color: "#3498db",
+                    useImage: true,
+                    imageName: "ennemi_3",
                     size: 28,
                     pattern: "zigzag",
                     zigzag: {
@@ -78,10 +75,9 @@ const LEVEL_CONFIGS = {
             // 30% de chance : ennemi simple + tire des projectiles
             {
                 weight: 30,
-                // TODO: @Maxime - changer shape/color par png ennemis
                 enemy: {
-                    shape: "circle",
-                    color: "#2ecc71",
+                    useImage: true,
+                    imageName: "ennemi_4",
                     size: 26,
                     pattern: "straight",
                     canShoot: true,
